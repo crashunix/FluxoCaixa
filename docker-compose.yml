@@ -1,0 +1,16 @@
+version: '3.8'
+
+include:
+  - path: src/Transactions/docker-compose.yml
+  - path: src/Consolidated/docker-compose.yml
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: fluxocaixa-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
