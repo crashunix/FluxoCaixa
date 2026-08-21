@@ -1,0 +1,1 @@
+namespace FluxoCaixa.Transactions.Application.Commands.CreateTransaction;
