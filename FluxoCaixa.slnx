@@ -15,4 +15,9 @@
     <Project Path="src/Transactions/FluxoCaixa.Transactions.Domain/FluxoCaixa.Transactions.Domain.csproj" />
     <Project Path="src/Transactions/FluxoCaixa.Transactions.Infrastructure/FluxoCaixa.Transactions.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FluxoCaixa.Consolidated.UnitTests/FluxoCaixa.Consolidated.UnitTests.csproj" />
+    <Project Path="tests/FluxoCaixa.IntegrationTests/FluxoCaixa.IntegrationTests.csproj" />
+    <Project Path="tests/FluxoCaixa.Transactions.UnitTests/FluxoCaixa.Transactions.UnitTests.csproj" />
+  </Folder>
 </Solution>
