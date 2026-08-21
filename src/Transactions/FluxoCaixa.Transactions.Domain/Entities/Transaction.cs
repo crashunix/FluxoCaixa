@@ -43,4 +43,9 @@ public class Transaction
         return new Transaction(Guid.NewGuid(), amount, DateTime.UtcNow, transactionType, description);
     }
 
+    public static Transaction Restore(Guid id, Money amount, DateTime createdAt, ETransactionType transactionType, string description)
+    {
+        return new Transaction(id, amount, createdAt, transactionType, description);
+    }
+
 }
