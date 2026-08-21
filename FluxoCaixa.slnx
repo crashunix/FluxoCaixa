@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Consolidated/">
+    <Project Path="src/Consolidated/FluxoCaixa.Consolidated.Application/FluxoCaixa.Consolidated.Application.csproj" />
+    <Project Path="src/Consolidated/FluxoCaixa.Consolidated.Domain/FluxoCaixa.Consolidated.Domain.csproj" />
+    <Project Path="src/Consolidated/FluxoCaixa.Consolidated.Infrastructure/FluxoCaixa.Consolidated.Infrastructure.csproj" />
+    <Project Path="src/Consolidated/FluxoCaixa.Consolidated.Worker/FluxoCaixa.Consolidated.Worker.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/FluxoCaixa.Shared/FluxoCaixa.Shared.csproj" />
+  </Folder>
+  <Folder Name="/src/Transactions/">
+    <Project Path="src/Transactions/FluxoCaixa.Transactions.Api/FluxoCaixa.Transactions.Api.csproj" />
+    <Project Path="src/Transactions/FluxoCaixa.Transactions.Application/FluxoCaixa.Transactions.Application.csproj" />
+    <Project Path="src/Transactions/FluxoCaixa.Transactions.Domain/FluxoCaixa.Transactions.Domain.csproj" />
+    <Project Path="src/Transactions/FluxoCaixa.Transactions.Infrastructure/FluxoCaixa.Transactions.Infrastructure.csproj" />
+  </Folder>
+</Solution>
