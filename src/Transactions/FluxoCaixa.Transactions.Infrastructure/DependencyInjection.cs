@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddSerilog((serviceProvider, loggerConfig) =>
         {
             loggerConfig
+                .ReadFrom.Configuration(configuration)
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
                 .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
@@ -59,8 +60,6 @@ public static class DependencyInjection
             .WithTracing(tracing =>
             {
                 tracing
-                    .AddSource("FluxoCaixa.*")
-                    .AddSource("MediatR")
                     .AddSource("FluxoCaixa.Transactions")
                     .AddAspNetCoreInstrumentation()
                     .AddNpgsql()
