@@ -22,10 +22,10 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=fluxocaixa_transactions;Username=postgres;Password=postgres
       - RabbitMQ__Host=rabbitmq
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
       - postgres
-      - jaeger
+      - otel-collector
 
 volumes:
   postgres-data:

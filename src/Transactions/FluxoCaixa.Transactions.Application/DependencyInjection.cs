@@ -1,4 +1,5 @@
 using FluentValidation;
+using FluxoCaixa.Shared.Behaviors;
 using FluxoCaixa.Transactions.Application.Common.Behaviors;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,11 +1,17 @@
+using FluxoCaixa.Shared.Extensions;
 using FluxoCaixa.Transactions.Api.Middlewares;
 using FluxoCaixa.Transactions.Application;
 using FluxoCaixa.Transactions.Application.Commands.CreateTransaction;
 using FluxoCaixa.Transactions.Infrastructure;
 using MediatR;
-using Serilog;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddOpenTelemetryObservability("Transactions.Api", tracing =>
+{
+    tracing.AddNpgsql();
+});
 
 builder.Services.AddOpenApi();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -16,7 +22,6 @@ builder.Services.AddTransactionsInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())

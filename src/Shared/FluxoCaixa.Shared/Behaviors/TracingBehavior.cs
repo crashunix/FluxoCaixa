@@ -1,12 +1,12 @@
 using System.Diagnostics;
 using MediatR;
 
-namespace FluxoCaixa.Transactions.Application.Common.Behaviors;
+namespace FluxoCaixa.Shared.Behaviors;
 
 public class TracingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
-    private static readonly ActivitySource ActivitySource = new("FluxoCaixa.Transactions");
+    private static readonly ActivitySource ActivitySource = new("FluxoCaixa.MediatR");
 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {

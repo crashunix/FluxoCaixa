@@ -1,4 +1,8 @@
+using FluxoCaixa.Shared.Extensions;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddOpenTelemetryObservability("Consolidated.Worker");
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
