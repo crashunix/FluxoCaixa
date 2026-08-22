@@ -16,8 +16,6 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
 
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        _logger.LogError(exception, "Ocorreu um erro não tratado: {Message}", exception.Message);
-
         var problemDetails = exception switch
         {
             // Erro de Validação do fluent
@@ -53,6 +51,15 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 Detail = "Ocorreu um erro interno no servidor."
             }
         };
+
+        if (problemDetails.Status == StatusCodes.Status500InternalServerError)
+        {
+            _logger.LogError(exception, "Erro crítico não tratado no servidor: {Message}", exception.Message);
+        }
+        else
+        {
+            _logger.LogWarning("Aviso de validação ({Status}): {Message}", problemDetails.Status, exception.Message);
+        }
 
         httpContext.Response.StatusCode = problemDetails.Status ?? StatusCodes.Status500InternalServerError;
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
