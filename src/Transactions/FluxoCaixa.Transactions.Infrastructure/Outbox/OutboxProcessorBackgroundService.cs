@@ -12,23 +12,22 @@ namespace FluxoCaixa.Transactions.Infrastructure.Outbox;
 public sealed class OutboxProcessorBackgroundService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IOutboxSignal _outboxSignal;
     private readonly ILogger<OutboxProcessorBackgroundService> _logger;
-    private static readonly TimeSpan FallbackTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(2);
 
     public OutboxProcessorBackgroundService(
         IServiceScopeFactory scopeFactory,
-        IOutboxSignal outboxSignal,
         ILogger<OutboxProcessorBackgroundService> logger)
     {
         _scopeFactory = scopeFactory;
-        _outboxSignal = outboxSignal;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Outbox Processor Background Service iniciado.");
+
+        using var timer = new PeriodicTimer(PollingInterval);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -41,7 +40,14 @@ public sealed class OutboxProcessorBackgroundService : BackgroundService
                 _logger.LogError(ex, "Erro ao processar mensagens da fila Outbox.");
             }
 
-            await _outboxSignal.WaitForSignalAsync(FallbackTimeout, stoppingToken);
+            try
+            {
+                await timer.WaitForNextTickAsync(stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
         }
     }
 

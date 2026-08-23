@@ -14,18 +14,15 @@ public sealed class CreateTransactionCommandHandler : IRequestHandler<CreateTran
 {
     private readonly ITransactionRepository _transactionRepository;
     private readonly IOutboxRepository _outboxRepository;
-    private readonly IOutboxSignal _outboxSignal;
     private readonly ILogger<CreateTransactionCommandHandler> _logger;
 
     public CreateTransactionCommandHandler(
         ITransactionRepository transactionRepository,
         IOutboxRepository outboxRepository,
-        IOutboxSignal outboxSignal,
         ILogger<CreateTransactionCommandHandler> logger)
     {
         _transactionRepository = transactionRepository;
         _outboxRepository = outboxRepository;
-        _outboxSignal = outboxSignal;
         _logger = logger;
     }
 
@@ -61,8 +58,6 @@ public sealed class CreateTransactionCommandHandler : IRequestHandler<CreateTran
         await _outboxRepository.AddAsync(outboxMessage, cancellationToken);
 
         await _transactionRepository.SaveChangesAsync(cancellationToken);
-
-        _outboxSignal.Notify();
 
         _logger.LogInformation("Transação {Id} de {Amount} {Currency} ({Type}) criada com sucesso.", 
             transaction.Id, transaction.Amount.Value, transaction.Amount.Currency, transaction.TransactionType);

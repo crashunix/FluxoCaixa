@@ -27,7 +27,6 @@ public static class DependencyInjection
 
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IOutboxRepository, OutboxRepository>();
-        services.AddSingleton<IOutboxSignal, OutboxSignal>();
         services.AddSingleton<IMessageBus, RabbitMqPublisher>();
 
         services.AddHostedService<OutboxProcessorBackgroundService>();
