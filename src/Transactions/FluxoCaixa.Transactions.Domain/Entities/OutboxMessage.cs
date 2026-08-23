@@ -10,4 +10,5 @@ public sealed class OutboxMessage
     public string? Error { get; set; }
     public string? TraceId { get; set; }
     public string? SpanId { get; set; }
+    public int RetryCount { get; set; }
 }

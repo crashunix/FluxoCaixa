@@ -26,7 +26,11 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.Property(o => o.ProcessedOnUtc)
             .IsRequired(false);
             
-        builder.HasIndex(o => o.ProcessedOnUtc)
+        builder.Property(o => o.RetryCount)
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.HasIndex(o => new { o.OccurredOnUtc, o.RetryCount })
             .HasFilter("\"ProcessedOnUtc\" IS NULL");
 
         builder.Property(o => o.Error)

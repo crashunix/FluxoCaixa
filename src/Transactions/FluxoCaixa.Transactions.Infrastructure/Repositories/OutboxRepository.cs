@@ -19,12 +19,10 @@ public class OutboxRepository : IOutboxRepository
         await _dbContext.OutboxMessages.AddAsync(outboxMessage, cancellationToken);
     }
 
-    public async Task<List<OutboxMessage>> GetUnprocessedMessagesAsync(int batchSize, CancellationToken cancellationToken = default)
+    public async Task<List<OutboxMessage>> GetUnprocessedMessagesAsync(int batchSize, int maxRetries = 5, CancellationToken cancellationToken = default)
     {
         return await _dbContext.OutboxMessages
-            .Where(m => m.ProcessedOnUtc == null)
-            .OrderBy(m => m.OccurredOnUtc)
-            .Take(batchSize)
+            .FromSqlInterpolated($"SELECT * FROM \"OutboxMessages\" WHERE \"ProcessedOnUtc\" IS NULL AND \"RetryCount\" < {maxRetries} ORDER BY \"OccurredOnUtc\" ASC LIMIT {batchSize} FOR UPDATE SKIP LOCKED")
             .ToListAsync(cancellationToken);
     }
 

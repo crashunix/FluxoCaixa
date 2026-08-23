@@ -1,5 +1,6 @@
 using FluxoCaixa.Transactions.Domain.Interfaces.Messaging;
 using FluxoCaixa.Transactions.Domain.Interfaces.Repositories;
+using FluxoCaixa.Transactions.Infrastructure.Context;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -45,13 +46,20 @@ public sealed class OutboxProcessorBackgroundService : BackgroundService
     private async Task ProcessOutboxMessagesAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<TransactionsDbContext>();
         var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
         var messageBus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
 
-        var messages = await outboxRepository.GetUnprocessedMessagesAsync(100, cancellationToken);
+        const int maxRetries = 5;
+        const int batchSize = 100;
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var messages = await outboxRepository.GetUnprocessedMessagesAsync(batchSize, maxRetries, cancellationToken);
 
         if (messages.Count == 0)
         {
+            await transaction.CommitAsync(cancellationToken);
             return;
         }
 
@@ -69,16 +77,24 @@ public sealed class OutboxProcessorBackgroundService : BackgroundService
             }
 
             await outboxRepository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             _logger.LogInformation("Lote de {Count} mensagem(ns) do Outbox publicado no RabbitMQ e atualizado no banco.", messages.Count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Falha ao publicar lote de {Count} mensagem(ns) do Outbox no RabbitMQ.", messages.Count);
+            _logger.LogError(ex, "Falha ao publicar lote de {Count} mensagem(ns) do Outbox no RabbitMQ. Incrementando RetryCount.", messages.Count);
             foreach (var message in messages)
             {
+                message.RetryCount++;
                 message.Error = ex.Message;
+                if (message.RetryCount >= maxRetries)
+                {
+                    _logger.LogWarning("Mensagem Outbox {Id} atingiu o limite máximo de retries ({MaxRetries}) e não será mais reprocessada automaticamente.", message.Id, maxRetries);
+                }
             }
+
             await outboxRepository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
     }
 }
