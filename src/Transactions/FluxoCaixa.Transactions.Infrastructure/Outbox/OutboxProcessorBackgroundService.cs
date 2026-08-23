@@ -1,3 +1,4 @@
+using FluxoCaixa.Transactions.Domain.Interfaces.Messaging;
 using FluxoCaixa.Transactions.Domain.Interfaces.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -41,6 +42,7 @@ public sealed class OutboxProcessorBackgroundService : BackgroundService
     {
         using var scope = _scopeFactory.CreateScope();
         var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
+        var messageBus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
 
         var messages = await outboxRepository.GetUnprocessedMessagesAsync(20, cancellationToken);
 
@@ -51,22 +53,24 @@ public sealed class OutboxProcessorBackgroundService : BackgroundService
 
         _logger.LogInformation("Outbox Processor encontrou {Count} mensagem(ns) pendente(s).", messages.Count);
 
-        foreach (var message in messages)
+        try
         {
-            try
+            var batchPayloads = messages.Select(m => (m.Type, m.Content));
+
+            await messageBus.PublishBatchAsync(batchPayloads, cancellationToken);
+
+            var now = DateTime.UtcNow;
+            foreach (var message in messages)
             {
-                _logger.LogInformation("Publicando mensagem do Outbox {Id} do tipo {Type}...", message.Id, message.Type);
-
-                // Publicar mensagem no rabbitmq
-                //
-                //
-
-                message.ProcessedOnUtc = DateTime.UtcNow;
+                message.ProcessedOnUtc = now;
                 message.Error = null;
             }
-            catch (Exception ex)
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Falha ao publicar lote de mensagens do Outbox no RabbitMQ.");
+            foreach (var message in messages)
             {
-                _logger.LogError(ex, "Falha ao publicar mensagem {Id} do Outbox.", message.Id);
                 message.Error = ex.Message;
             }
         }

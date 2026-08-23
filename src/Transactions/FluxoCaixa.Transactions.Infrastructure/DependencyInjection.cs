@@ -1,5 +1,7 @@
+using FluxoCaixa.Transactions.Domain.Interfaces.Messaging;
 using FluxoCaixa.Transactions.Domain.Interfaces.Repositories;
 using FluxoCaixa.Transactions.Infrastructure.Context;
+using FluxoCaixa.Transactions.Infrastructure.Messaging;
 using FluxoCaixa.Transactions.Infrastructure.Outbox;
 using FluxoCaixa.Transactions.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +27,7 @@ public static class DependencyInjection
 
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IOutboxRepository, OutboxRepository>();
+        services.AddSingleton<IMessageBus, RabbitMqPublisher>();
 
         services.AddHostedService<OutboxProcessorBackgroundService>();
 
