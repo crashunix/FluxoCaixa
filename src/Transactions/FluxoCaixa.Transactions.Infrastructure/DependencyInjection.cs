@@ -4,6 +4,7 @@ using FluxoCaixa.Transactions.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace FluxoCaixa.Transactions.Infrastructure;
 
@@ -15,10 +16,26 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");
 
         services.AddDbContext<TransactionsDbContext>(options =>
-            options.UseNpgsql(connectionString, options => options.MigrationsAssembly(typeof(TransactionsDbContext).Assembly.FullName)));
+            options.UseNpgsql(connectionString, npgsqlOptions =>
+            {
+                npgsqlOptions.MigrationsAssembly(typeof(TransactionsDbContext).Assembly.FullName);
+                npgsqlOptions.EnableRetryOnFailure();
+            }));
 
         services.AddScoped<ITransactionRepository, TransactionRepository>();
 
         return services;
+    }
+
+    public static async Task ApplyTransactionsMigrationsAsync(this IHost host)
+    {
+        using var scope = host.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<TransactionsDbContext>();
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        
+        await strategy.ExecuteAsync(async () =>
+        {
+            await dbContext.Database.MigrateAsync();
+        });
     }
 }

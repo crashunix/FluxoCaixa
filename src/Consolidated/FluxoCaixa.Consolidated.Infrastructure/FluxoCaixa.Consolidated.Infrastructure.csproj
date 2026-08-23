@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\FluxoCaixa.Consolidated.Application\FluxoCaixa.Consolidated.Application.csproj" />
@@ -6,9 +6,7 @@
     <ProjectReference Include="..\..\Shared\FluxoCaixa.Shared\FluxoCaixa.Shared.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="MassTransit.RabbitMQ" Version="9.2.0" />
-  </ItemGroup>
+
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

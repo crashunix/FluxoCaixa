@@ -10,6 +10,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fluxocaixa_transactions"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
 
   transactions-api:
     build:
@@ -21,11 +26,12 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=fluxocaixa_transactions;Username=postgres;Password=postgres
-      - RabbitMQ__Host=rabbitmq
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
-      - postgres
-      - otel-collector
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
 
 volumes:
   postgres-data:

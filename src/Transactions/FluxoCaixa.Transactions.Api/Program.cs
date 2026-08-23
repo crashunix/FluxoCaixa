@@ -22,6 +22,8 @@ builder.Services.AddTransactionsInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
+await app.ApplyTransactionsMigrationsAsync();
+
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
