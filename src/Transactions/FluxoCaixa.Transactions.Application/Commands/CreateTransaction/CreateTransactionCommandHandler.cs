@@ -1,3 +1,5 @@
+using System.Text.Json;
+using FluxoCaixa.Shared.Events;
 using FluxoCaixa.Transactions.Domain.Entities;
 using FluxoCaixa.Transactions.Domain.Interfaces.Repositories;
 using FluxoCaixa.Transactions.Domain.ValueObjects;
@@ -9,13 +11,16 @@ namespace FluxoCaixa.Transactions.Application.Commands.CreateTransaction;
 public sealed class CreateTransactionCommandHandler : IRequestHandler<CreateTransactionCommand, CreateTransactionResult>
 {
     private readonly ITransactionRepository _transactionRepository;
+    private readonly IOutboxRepository _outboxRepository;
     private readonly ILogger<CreateTransactionCommandHandler> _logger;
 
     public CreateTransactionCommandHandler(
         ITransactionRepository transactionRepository,
+        IOutboxRepository outboxRepository,
         ILogger<CreateTransactionCommandHandler> logger)
     {
         _transactionRepository = transactionRepository;
+        _outboxRepository = outboxRepository;
         _logger = logger;
     }
 
@@ -26,6 +31,26 @@ public sealed class CreateTransactionCommandHandler : IRequestHandler<CreateTran
         var transaction = Transaction.Create(amount, command.TransactionType, description);
 
         await _transactionRepository.AddAsync(transaction, cancellationToken);
+
+        var transactionEvent = new TransactionCreatedEvent(
+            transaction.Id,
+            transaction.Amount.Value,
+            transaction.Amount.Currency,
+            (int)transaction.TransactionType,
+            transaction.Description,
+            transaction.CreatedAt
+        );
+
+        var outboxMessage = new OutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            Type = typeof(TransactionCreatedEvent).FullName ?? nameof(TransactionCreatedEvent),
+            Content = JsonSerializer.Serialize(transactionEvent),
+            OccurredOnUtc = transaction.CreatedAt
+        };
+
+        await _outboxRepository.AddAsync(outboxMessage, cancellationToken);
+
         await _transactionRepository.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Transação {Id} de {Amount} {Currency} ({Type}) criada com sucesso.", 

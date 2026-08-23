@@ -1,4 +1,5 @@
 using FluxoCaixa.Transactions.Domain.Entities;
+using FluxoCaixa.Transactions.Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace FluxoCaixa.Transactions.Infrastructure.Context;
@@ -10,6 +11,7 @@ public class TransactionsDbContext : DbContext
     }
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
