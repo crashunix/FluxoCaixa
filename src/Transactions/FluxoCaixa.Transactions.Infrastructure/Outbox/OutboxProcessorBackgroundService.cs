@@ -10,7 +10,7 @@ public sealed class OutboxProcessorBackgroundService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<OutboxProcessorBackgroundService> _logger;
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
 
     public OutboxProcessorBackgroundService(
         IServiceScopeFactory scopeFactory,
@@ -44,7 +44,7 @@ public sealed class OutboxProcessorBackgroundService : BackgroundService
         var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
         var messageBus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
 
-        var messages = await outboxRepository.GetUnprocessedMessagesAsync(20, cancellationToken);
+        var messages = await outboxRepository.GetUnprocessedMessagesAsync(100, cancellationToken);
 
         if (messages.Count == 0)
         {
