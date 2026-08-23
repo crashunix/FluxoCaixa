@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using FluxoCaixa.Transactions.Domain.Interfaces.Messaging;
 using Microsoft.Extensions.Configuration;
@@ -8,6 +9,8 @@ namespace FluxoCaixa.Transactions.Infrastructure.Messaging;
 
 public sealed class RabbitMqPublisher : IMessageBus, IAsyncDisposable
 {
+    private static readonly ActivitySource ActivitySource = new("FluxoCaixa.Transactions.Publisher");
+
     private readonly IConfiguration _configuration;
     private readonly ILogger<RabbitMqPublisher> _logger;
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
@@ -23,14 +26,14 @@ public sealed class RabbitMqPublisher : IMessageBus, IAsyncDisposable
         _logger = logger;
     }
 
-    public async Task PublishAsync(string messageType, string messageContent, CancellationToken cancellationToken = default)
+    public async Task PublishAsync(string messageType, string messageContent, string? traceId = null, string? spanId = null, CancellationToken cancellationToken = default)
     {
-        await PublishBatchAsync(new[] { (messageType, messageContent) }, cancellationToken);
+        await PublishBatchAsync(new[] { (messageType, messageContent, traceId, spanId) }, cancellationToken);
     }
 
-    public async Task PublishBatchAsync(IEnumerable<(string MessageType, string MessageContent)> messages, CancellationToken cancellationToken = default)
+    public async Task PublishBatchAsync(IEnumerable<(string MessageType, string MessageContent, string? TraceId, string? SpanId)> messages, CancellationToken cancellationToken = default)
     {
-        var messageList = messages as IList<(string MessageType, string MessageContent)> ?? messages.ToList();
+        var messageList = messages as IList<(string MessageType, string MessageContent, string? TraceId, string? SpanId)> ?? messages.ToList();
         if (messageList.Count == 0)
         {
             return;
@@ -39,23 +42,58 @@ public sealed class RabbitMqPublisher : IMessageBus, IAsyncDisposable
         var connection = await GetConnectionAsync(cancellationToken);
         using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
 
-        foreach (var (messageType, messageContent) in messageList)
+        foreach (var (messageType, messageContent, traceId, spanId) in messageList)
         {
-            var body = Encoding.UTF8.GetBytes(messageContent);
-            var props = new BasicProperties
+            Activity? activity = null;
+            if (!string.IsNullOrWhiteSpace(traceId) && !string.IsNullOrWhiteSpace(spanId))
             {
-                ContentType = "application/json",
-                DeliveryMode = DeliveryModes.Persistent,
-                Type = messageType
-            };
+                try
+                {
+                    var parsedTraceId = ActivityTraceId.CreateFromString(traceId);
+                    var parsedSpanId = ActivitySpanId.CreateFromString(spanId);
+                    var parentContext = new ActivityContext(parsedTraceId, parsedSpanId, ActivityTraceFlags.Recorded);
+                    activity = ActivitySource.StartActivity("RabbitMQ Publish " + messageType, ActivityKind.Producer, parentContext);
+                }
+                catch
+                {
+                    activity = ActivitySource.StartActivity("RabbitMQ Publish " + messageType, ActivityKind.Producer);
+                }
+            }
+            else
+            {
+                activity = ActivitySource.StartActivity("RabbitMQ Publish " + messageType, ActivityKind.Producer);
+            }
 
-            await channel.BasicPublishAsync(
-                exchange: ExchangeName,
-                routingKey: RoutingKey,
-                mandatory: false,
-                basicProperties: props,
-                body: body,
-                cancellationToken: cancellationToken);
+            using (activity)
+            {
+                var currentTraceId = activity?.TraceId.ToString() ?? traceId ?? Guid.NewGuid().ToString("N");
+                var currentSpanId = activity?.SpanId.ToString() ?? spanId ?? Guid.NewGuid().ToString("N").Substring(0, 16);
+
+                var body = Encoding.UTF8.GetBytes(messageContent);
+                var props = new BasicProperties
+                {
+                    ContentType = "application/json",
+                    DeliveryMode = DeliveryModes.Persistent,
+                    Type = messageType,
+                    CorrelationId = currentTraceId
+                };
+
+                var headers = new Dictionary<string, object?>
+                {
+                    ["traceId"] = currentTraceId,
+                    ["spanId"] = currentSpanId,
+                    ["traceparent"] = $"00-{currentTraceId.PadLeft(32, '0')}-{currentSpanId.PadLeft(16, '0')}-01"
+                };
+                props.Headers = headers;
+
+                await channel.BasicPublishAsync(
+                    exchange: ExchangeName,
+                    routingKey: RoutingKey,
+                    mandatory: false,
+                    basicProperties: props,
+                    body: body,
+                    cancellationToken: cancellationToken);
+            }
         }
     }
 

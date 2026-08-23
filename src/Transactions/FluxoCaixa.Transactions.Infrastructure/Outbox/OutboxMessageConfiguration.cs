@@ -32,5 +32,12 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.Property(o => o.Error)
             .IsRequired(false);
 
+        builder.Property(o => o.TraceId)
+            .HasMaxLength(255)
+            .IsRequired(false);
+
+        builder.Property(o => o.SpanId)
+            .HasMaxLength(255)
+            .IsRequired(false);
     }
 }

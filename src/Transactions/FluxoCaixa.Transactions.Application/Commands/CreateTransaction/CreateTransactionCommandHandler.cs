@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using FluxoCaixa.Shared.Events;
 using FluxoCaixa.Transactions.Domain.Entities;
@@ -45,12 +46,16 @@ public sealed class CreateTransactionCommandHandler : IRequestHandler<CreateTran
             transaction.CreatedAt
         );
 
+        var currentActivity = Activity.Current;
+
         var outboxMessage = new OutboxMessage
         {
             Id = Guid.NewGuid(),
             Type = typeof(TransactionCreatedEvent).FullName ?? nameof(TransactionCreatedEvent),
             Content = JsonSerializer.Serialize(transactionEvent),
-            OccurredOnUtc = transaction.CreatedAt
+            OccurredOnUtc = transaction.CreatedAt,
+            TraceId = currentActivity?.TraceId.ToString(),
+            SpanId = currentActivity?.SpanId.ToString()
         };
 
         await _outboxRepository.AddAsync(outboxMessage, cancellationToken);

@@ -57,7 +57,7 @@ public sealed class OutboxProcessorBackgroundService : BackgroundService
 
         try
         {
-            var batchPayloads = messages.Select(m => (m.Type, m.Content));
+            var batchPayloads = messages.Select(m => (m.Type, m.Content, m.TraceId, m.SpanId));
 
             await messageBus.PublishBatchAsync(batchPayloads, cancellationToken);
 
