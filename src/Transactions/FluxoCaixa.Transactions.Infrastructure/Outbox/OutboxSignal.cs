@@ -23,11 +23,15 @@ public sealed class OutboxSignal : IOutboxSignal
 
         try
         {
-            await _channel.Reader.ReadAsync(cts.Token);
+            if (await _channel.Reader.WaitToReadAsync(cts.Token))
+            {
+                // Drena todos os sinais acumulados
+                while (_channel.Reader.TryRead(out _)) { }
+            }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // Timeout expirado sem novos sinais (fallback de segurança)
+            // Timeout expirado sem novos sinais
         }
     }
 }

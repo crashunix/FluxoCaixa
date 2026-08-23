@@ -1,6 +1,8 @@
 using FluxoCaixa.Transactions.Domain.Interfaces.Messaging;
 using FluxoCaixa.Transactions.Domain.Interfaces.Repositories;
 using FluxoCaixa.Transactions.Infrastructure.Context;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -45,56 +47,67 @@ public sealed class OutboxProcessorBackgroundService : BackgroundService
 
     private async Task ProcessOutboxMessagesAsync(CancellationToken cancellationToken)
     {
-        using var scope = _scopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<TransactionsDbContext>();
-        var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
-        var messageBus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-
         const int maxRetries = 5;
         const int batchSize = 100;
+        int processedCount;
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-        var messages = await outboxRepository.GetUnprocessedMessagesAsync(batchSize, maxRetries, cancellationToken);
-
-        if (messages.Count == 0)
+        do
         {
-            await transaction.CommitAsync(cancellationToken);
-            return;
-        }
+            using var scope = _scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<TransactionsDbContext>();
+            var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
+            var messageBus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
 
-        try
-        {
-            var batchPayloads = messages.Select(m => (m.Type, m.Content, m.TraceId, m.SpanId));
+            var strategy = dbContext.Database.CreateExecutionStrategy();
 
-            await messageBus.PublishBatchAsync(batchPayloads, cancellationToken);
-
-            var now = DateTime.UtcNow;
-            foreach (var message in messages)
+            processedCount = await strategy.ExecuteAsync(async () =>
             {
-                message.ProcessedOnUtc = now;
-                message.Error = null;
-            }
+                await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-            await outboxRepository.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            _logger.LogInformation("Lote de {Count} mensagem(ns) do Outbox publicado no RabbitMQ e atualizado no banco.", messages.Count);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Falha ao publicar lote de {Count} mensagem(ns) do Outbox no RabbitMQ. Incrementando RetryCount.", messages.Count);
-            foreach (var message in messages)
-            {
-                message.RetryCount++;
-                message.Error = ex.Message;
-                if (message.RetryCount >= maxRetries)
+                var messages = await outboxRepository.GetUnprocessedMessagesAsync(batchSize, maxRetries, cancellationToken);
+
+                if (messages.Count == 0)
                 {
-                    _logger.LogWarning("Mensagem Outbox {Id} atingiu o limite máximo de retries ({MaxRetries}) e não será mais reprocessada automaticamente.", message.Id, maxRetries);
+                    await transaction.CommitAsync(cancellationToken);
+                    return 0;
                 }
-            }
 
-            await outboxRepository.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
+                try
+                {
+                    var batchPayloads = messages.Select(m => (m.Type, m.Content, m.TraceId, m.SpanId));
+
+                    await messageBus.PublishBatchAsync(batchPayloads, cancellationToken);
+
+                    var now = DateTime.UtcNow;
+                    foreach (var message in messages)
+                    {
+                        message.ProcessedOnUtc = now;
+                        message.Error = null;
+                    }
+
+                    await outboxRepository.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    _logger.LogInformation("Lote de {Count} mensagem(ns) do Outbox publicado no RabbitMQ e atualizado no banco.", messages.Count);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Falha ao publicar lote de {Count} mensagem(ns) do Outbox no RabbitMQ. Incrementando RetryCount.", messages.Count);
+                    foreach (var message in messages)
+                    {
+                        message.RetryCount++;
+                        message.Error = ex.Message;
+                        if (message.RetryCount >= maxRetries)
+                        {
+                            _logger.LogWarning("Mensagem Outbox {Id} atingiu o limite máximo de retries ({MaxRetries}) e não será mais reprocessada automaticamente.", message.Id, maxRetries);
+                        }
+                    }
+
+                    await outboxRepository.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                }
+
+                return messages.Count;
+            });
+        } while (processedCount == batchSize && !cancellationToken.IsCancellationRequested);
     }
 }
