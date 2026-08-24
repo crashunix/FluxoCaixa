@@ -23,6 +23,11 @@ public sealed class TransactionCreatedConsumer : BackgroundService
     private const string QueueName = "transaction-created-queue";
     private const string RoutingKey = "transaction.created";
 
+    private const string BatchSpanName = $"{QueueName} process";
+    private const string MessageSpanName = $"{QueueName} process";
+    private const string MessagingSystem = "rabbitmq";
+    private const string MessagingOperation = "process";
+
     private sealed record ConsumedMessage(
         ulong DeliveryTag,
         byte[] Body,
@@ -120,7 +125,7 @@ public sealed class TransactionCreatedConsumer : BackgroundService
         });
 
         var consumer = new AsyncEventingBasicConsumer(channel);
-        consumer.ReceivedAsync += async (model, ea) =>
+        consumer.ReceivedAsync += async (_, ea) =>
         {
             IDictionary<string, object?>? headers = ea.BasicProperties?.Headers is null
                 ? null
@@ -203,7 +208,7 @@ public sealed class TransactionCreatedConsumer : BackgroundService
 
         var maxDeliveryTag = batch.Max(x => x.DeliveryTag);
 
-        var validItems = new List<(ConsumedMessage Msg, TransactionCreatedEvent Event, ActivityContext? TraceContext)>();
+        var validItems = new List<(ConsumedMessage Msg, TransactionCreatedEvent Event, ActivityContext? TraceContext)>(batch.Count);
         var invalidItems = new List<ConsumedMessage>();
 
         foreach (var msg in batch)
@@ -214,8 +219,7 @@ public sealed class TransactionCreatedConsumer : BackgroundService
 
                 if (eventData is not null && eventData.Id != Guid.Empty)
                 {
-                    var traceCtx = ExtractTraceContext(msg);
-                    validItems.Add((msg, eventData, traceCtx));
+                    validItems.Add((msg, eventData, ExtractTraceContext(msg)));
                 }
                 else
                 {
@@ -223,16 +227,20 @@ public sealed class TransactionCreatedConsumer : BackgroundService
                     invalidItems.Add(msg);
                 }
             }
-            catch (Exception ex)
+            catch (JsonException ex)
             {
                 _logger.LogError(ex, "Erro ao deserializar mensagem JSON.");
                 invalidItems.Add(msg);
             }
         }
 
+        // Nack imediato e sem requeue para mensagens com payload inválido.
         if (invalidItems.Count > 0)
         {
-            _logger.LogError("{Count} mensagens com payload invalido ignoradas no lote. Executando Nack sem requeue.", invalidItems.Count);
+            _logger.LogError(
+                "{Count} mensagens com payload invalido ignoradas no lote. Executando Nack sem requeue.",
+                invalidItems.Count);
+
             foreach (var invalidMsg in invalidItems)
             {
                 try
@@ -248,76 +256,113 @@ public sealed class TransactionCreatedConsumer : BackgroundService
 
         if (validItems.Count == 0)
         {
-            _logger.LogInformation("Nenhuma mensagem valida no lote de {Count} mensagens. Executando Ack em lote.", batch.Count);
+            _logger.LogInformation(
+                "Nenhuma mensagem valida no lote de {Count} mensagens. Executando Ack em lote.",
+                batch.Count);
             await channel.BasicAckAsync(maxDeliveryTag, multiple: true, cancellationToken);
             return;
         }
 
-        var links = new List<ActivityLink>();
-        foreach (var item in validItems)
-        {
-            if (item.TraceContext.HasValue)
-            {
-                links.Add(new ActivityLink(item.TraceContext.Value));
-            }
-        }
-
-        var primaryContext = validItems.FirstOrDefault(x => x.TraceContext.HasValue).TraceContext;
-
-        using var activity = primaryContext.HasValue
-            ? ActivitySource.StartActivity(
-                "Process TransactionCreatedEvents Batch",
-                ActivityKind.Consumer,
-                primaryContext.Value,
-                tags: null,
-                links: links.Count > 0 ? links : null)
-            : ActivitySource.StartActivity(
-                "Process TransactionCreatedEvents Batch",
-                ActivityKind.Consumer,
-                default(ActivityContext),
-                tags: null,
-                links: links.Count > 0 ? links : null);
-
-        activity?.SetTag("messaging.batch.message_count", batch.Count);
-
-        // deduplicação
+        // deduplicaćão
         var distinctEvents = validItems
             .GroupBy(x => x.Event.Id)
             .Select(g => g.First())
             .ToList();
 
+        var links = validItems
+            .Where(x => x.TraceContext.HasValue)
+            .Select(x => new ActivityLink(x.TraceContext!.Value))
+            .ToList();
+
+        using var batchActivity = ActivitySource.StartActivity(
+            BatchSpanName,
+            ActivityKind.Consumer,
+            parentContext: default,
+            links: links);
+
+        batchActivity?.SetTag("messaging.system",              MessagingSystem);
+        batchActivity?.SetTag("messaging.destination.name",    QueueName);
+        batchActivity?.SetTag("messaging.operation.type",      MessagingOperation);
+        batchActivity?.SetTag("messaging.batch.message_count", validItems.Count);
+
+        var batchStartTime = DateTimeOffset.UtcNow;
+        Exception? batchException = null;
+
         try
         {
-            using var scope = _scopeFactory.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IDailyBalanceRepository>();
+            using var scope      = _scopeFactory.CreateScope();
+            var repository       = scope.ServiceProvider.GetRequiredService<IDailyBalanceRepository>();
+            var eventsToProcess  = distinctEvents.Select(x => x.Event).ToList();
 
-            var eventsToProcess = distinctEvents.Select(x => x.Event).ToList();
             await repository.ProcessBatchAsync(eventsToProcess, cancellationToken);
 
             _logger.LogInformation("Lote de {TotalCount} mensagens processado no banco.", validItems.Count);
 
             await channel.BasicAckAsync(maxDeliveryTag, multiple: true, cancellationToken);
+
+            batchActivity?.SetStatus(ActivityStatusCode.Ok);
         }
         catch (Exception ex)
         {
+            batchException = ex;
+            batchActivity?.AddException(ex);
+            batchActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+
             _logger.LogError(ex, "Erro ao processar lote de {Count} mensagens no banco de dados. Reenfileirando (Nack).", batch.Count);
             await channel.BasicNackAsync(maxDeliveryTag, multiple: true, requeue: true, cancellationToken);
         }
+
+        foreach (var item in validItems)
+        {
+            if (!item.TraceContext.HasValue)
+                continue;
+
+            var msgActivity = ActivitySource.StartActivity(
+                MessageSpanName,
+                ActivityKind.Consumer,
+                parentContext: item.TraceContext.Value,
+                startTime: batchStartTime);
+
+            if (msgActivity is null)
+                continue;
+
+            msgActivity.SetTag("messaging.system",              MessagingSystem);
+            msgActivity.SetTag("messaging.destination.name",    QueueName);
+            msgActivity.SetTag("messaging.operation.type",      MessagingOperation);
+            msgActivity.SetTag("messaging.batch.message_count", validItems.Count);
+            msgActivity.SetTag("transaction.id",                item.Event.Id.ToString());
+            msgActivity.SetTag("transaction.amount",            item.Event.Amount);
+            msgActivity.SetTag("transaction.type",              item.Event.TransactionType);
+
+            if (batchException is null)
+            {
+                msgActivity.SetStatus(ActivityStatusCode.Ok);
+            }
+            else
+            {
+                msgActivity.AddException(batchException);
+                msgActivity.SetStatus(ActivityStatusCode.Error, batchException.Message);
+            }
+
+            msgActivity.Dispose();
+        }
     }
 
+    // ── Extração do contexto de trace W3C dos headers do RabbitMQ ────────────────
     private static ActivityContext? ExtractTraceContext(ConsumedMessage msg)
     {
         if (msg.Headers is null)
             return null;
 
-        string? traceparent = GetHeaderValue(msg.Headers, "traceparent");
-        if (!string.IsNullOrWhiteSpace(traceparent) && ActivityContext.TryParse(traceparent, null, out var parsedTraceparent))
+        var traceparent = GetHeaderValue(msg.Headers, "traceparent");
+        if (!string.IsNullOrWhiteSpace(traceparent)
+            && ActivityContext.TryParse(traceparent, null, isRemote: true, out var ctx))
         {
-            return parsedTraceparent;
+            return ctx;
         }
 
-        string? traceId = GetHeaderValue(msg.Headers, "traceId");
-        string? spanId = GetHeaderValue(msg.Headers, "spanId");
+        var traceId = GetHeaderValue(msg.Headers, "traceId");
+        var spanId  = GetHeaderValue(msg.Headers, "spanId");
 
         if (!string.IsNullOrWhiteSpace(traceId) && !string.IsNullOrWhiteSpace(spanId))
         {
@@ -326,7 +371,8 @@ public sealed class TransactionCreatedConsumer : BackgroundService
                 return new ActivityContext(
                     ActivityTraceId.CreateFromString(traceId),
                     ActivitySpanId.CreateFromString(spanId),
-                    ActivityTraceFlags.Recorded);
+                    ActivityTraceFlags.Recorded,
+                    isRemote: true);
             }
             catch
             {
@@ -339,15 +385,15 @@ public sealed class TransactionCreatedConsumer : BackgroundService
 
     private static string? GetHeaderValue(IDictionary<string, object?> headers, string key)
     {
-        if (headers.TryGetValue(key, out var val) && val is not null)
+        if (!headers.TryGetValue(key, out var val) || val is null)
+            return null;
+
+        return val switch
         {
-            if (val is byte[] bytes)
-                return Encoding.UTF8.GetString(bytes);
-            if (val is string str)
-                return str;
-            if (val is ReadOnlyMemory<byte> rom)
-                return Encoding.UTF8.GetString(rom.Span);
-        }
-        return null;
+            byte[]              bytes => Encoding.UTF8.GetString(bytes),
+            string              str   => str,
+            ReadOnlyMemory<byte> rom  => Encoding.UTF8.GetString(rom.Span),
+            _                         => null
+        };
     }
 }
