@@ -23,13 +23,14 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.MapGet("/consolidated", async ([FromQuery] DateOnly date, IDailyBalanceRepository repository, CancellationToken cancellationToken) =>
+app.MapGet("/consolidated", async ([FromQuery] DateOnly? date, IDailyBalanceRepository repository, CancellationToken cancellationToken) =>
 {
-    var balance = await repository.GetByDateAsync(date, cancellationToken);
+    var targetDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+    var balance = await repository.GetByDateAsync(targetDate, cancellationToken);
 
     if (balance is null)
     {
-        return Results.NotFound(new { message = $"Nenhum saldo consolidado encontrado para a data {date:yyyy-MM-dd}." });
+        return Results.NotFound(new { message = $"Nenhum saldo consolidado encontrado para a data {targetDate:yyyy-MM-dd}." });
     }
 
     return Results.Ok(balance);
