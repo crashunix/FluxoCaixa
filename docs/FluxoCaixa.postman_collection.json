@@ -1,0 +1,57 @@
+{
+  "info": {
+    "_postman_id": "64f5dcc3-961b-49b1-9564-35c2af081d0c",
+    "name": "FluxoCaixa",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "44959810"
+  },
+  "item": [
+    {
+      "name": "Consulta por dia",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5002/consolidated",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5002",
+          "path": [
+            "consolidated"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Cadastra transação",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 200000,\n  \"currency\": \"BRL\",\n  \"transactionType\": 2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:5001/transactions",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5001",
+          "path": [
+            "transactions"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

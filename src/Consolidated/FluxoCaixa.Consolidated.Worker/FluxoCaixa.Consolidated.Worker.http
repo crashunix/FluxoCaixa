@@ -1,5 +1,9 @@
 @baseUrl = http://localhost:5002
 
-### Obter Saldo Consolidado por Data
-GET {{baseUrl}}/api/consolidated?date=2026-08-24
+### Obter Saldo Consolidado de Hoje
+GET {{baseUrl}}/consolidated
+Accept: application/json
+
+### Obter Saldo Consolidado por Data Específica
+GET {{baseUrl}}/consolidated?date=2026-08-24
 Accept: application/json

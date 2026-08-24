@@ -1,0 +1,40 @@
+@transactionsHost = http://localhost:5001
+@workerHost = http://localhost:5002
+
+### ==========================================
+### TRANSACTIONS API (Porta 5001)
+### ==========================================
+
+### Criar Transação de Crédito
+POST {{transactionsHost}}/transactions
+Content-Type: application/json
+
+{
+  "amount": 150.50,
+  "currency": "BRL",
+  "transactionType": 1,
+  "description": "Venda de produto em loja física"
+}
+
+### Criar Transação de Débito
+POST {{transactionsHost}}/transactions
+Content-Type: application/json
+
+{
+  "amount": 45.00,
+  "currency": "BRL",
+  "transactionType": 2,
+  "description": "Pagamento de fornecedor de insumos"
+}
+
+### ==========================================
+### CONSOLIDATED WORKER (Porta 5002)
+### ==========================================
+
+### Obter Saldo Consolidado de Hoje (Sem data)
+GET {{workerHost}}/consolidated
+Accept: application/json
+
+### Obter Saldo Consolidado por Data Específica
+GET {{workerHost}}/consolidated?date=2026-08-24
+Accept: application/json
