@@ -8,12 +8,18 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="RabbitMQ.Client" Version="7.1.1" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.17.1" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FluxoCaixa.Consolidated.Domain\FluxoCaixa.Consolidated.Domain.csproj" />
     <ProjectReference Include="..\FluxoCaixa.Consolidated.Infrastructure\FluxoCaixa.Consolidated.Infrastructure.csproj" />
-    <ProjectReference Include="..\FluxoCaixa.Consolidated.Application\FluxoCaixa.Consolidated.Application.csproj" />
+    <ProjectReference Include="..\..\Shared\FluxoCaixa.Shared\FluxoCaixa.Shared.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,45 +1,41 @@
+using FluxoCaixa.Consolidated.Domain.Repositories;
+using FluxoCaixa.Consolidated.Infrastructure;
+using FluxoCaixa.Consolidated.Worker.Consumers;
 using FluxoCaixa.Shared.Extensions;
+using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddOpenTelemetryObservability("Consolidated.Worker");
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddConsolidatedInfrastructure(builder.Configuration);
+
+builder.Services.AddHostedService<TransactionCreatedConsumer>();
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
-app.UseHttpsRedirection();
-
-var summaries = new[]
+app.MapGet("/api/consolidated", async ([FromQuery] DateOnly date, IDailyBalanceRepository repository, CancellationToken cancellationToken) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var balance = await repository.GetByDateAsync(date, cancellationToken);
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+    if (balance is null)
+    {
+        return Results.NotFound(new { message = $"Nenhum saldo consolidado encontrado para a data {date:yyyy-MM-dd}." });
+    }
+
+    return Results.Ok(balance);
 })
-.WithName("GetWeatherForecast");
+.WithName("GetConsolidatedBalanceByDate");
+
+await app.ApplyConsolidatedMigrationsAsync();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

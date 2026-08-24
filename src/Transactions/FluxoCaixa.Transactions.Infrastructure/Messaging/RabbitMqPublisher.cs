@@ -49,17 +49,24 @@ public sealed class RabbitMqPublisher : IMessageBus, IAsyncDisposable
             {
                 try
                 {
-                    var parsedTraceId = ActivityTraceId.CreateFromString(traceId);
-                    var parsedSpanId = ActivitySpanId.CreateFromString(spanId);
-                    var parentContext = new ActivityContext(parsedTraceId, parsedSpanId, ActivityTraceFlags.Recorded);
-                    activity = ActivitySource.StartActivity("RabbitMQ Publish " + messageType, ActivityKind.Producer, parentContext);
+                    if (traceId.Length == 32 && spanId.Length == 16)
+                    {
+                        var parsedTraceId = ActivityTraceId.CreateFromString(traceId);
+                        var parsedSpanId = ActivitySpanId.CreateFromString(spanId);
+                        var parentContext = new ActivityContext(parsedTraceId, parsedSpanId, ActivityTraceFlags.Recorded);
+                        activity = ActivitySource.StartActivity(
+                            "RabbitMQ Publish " + messageType,
+                            ActivityKind.Producer,
+                            parentContext: parentContext);
+                    }
                 }
                 catch
                 {
-                    activity = ActivitySource.StartActivity("RabbitMQ Publish " + messageType, ActivityKind.Producer);
+                    // Fallback se falhar parse do trace context
                 }
             }
-            else
+
+            if (activity is null)
             {
                 activity = ActivitySource.StartActivity("RabbitMQ Publish " + messageType, ActivityKind.Producer);
             }

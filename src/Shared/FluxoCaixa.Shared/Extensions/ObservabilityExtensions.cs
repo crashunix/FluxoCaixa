@@ -48,6 +48,7 @@ public static class ObservabilityExtensions
                     .AddSource("FluxoCaixa.*")
                     .AddSource("FluxoCaixa.MediatR")
                     .AddSource("FluxoCaixa.Transactions")
+                    .AddSource("FluxoCaixa.Consolidated.Consumer")
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation();
 

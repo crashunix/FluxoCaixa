@@ -8,7 +8,6 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["src/Shared/FluxoCaixa.Shared/FluxoCaixa.Shared.csproj", "src/Shared/FluxoCaixa.Shared/"]
 COPY ["src/Consolidated/FluxoCaixa.Consolidated.Domain/FluxoCaixa.Consolidated.Domain.csproj", "src/Consolidated/FluxoCaixa.Consolidated.Domain/"]
-COPY ["src/Consolidated/FluxoCaixa.Consolidated.Application/FluxoCaixa.Consolidated.Application.csproj", "src/Consolidated/FluxoCaixa.Consolidated.Application/"]
 COPY ["src/Consolidated/FluxoCaixa.Consolidated.Infrastructure/FluxoCaixa.Consolidated.Infrastructure.csproj", "src/Consolidated/FluxoCaixa.Consolidated.Infrastructure/"]
 COPY ["src/Consolidated/FluxoCaixa.Consolidated.Worker/FluxoCaixa.Consolidated.Worker.csproj", "src/Consolidated/FluxoCaixa.Consolidated.Worker/"]
 RUN dotnet restore "src/Consolidated/FluxoCaixa.Consolidated.Worker/FluxoCaixa.Consolidated.Worker.csproj"

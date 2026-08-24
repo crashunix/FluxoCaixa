@@ -1,6 +1,21 @@
-version: '3.8'
-
 services:
+  postgres-consolidated:
+    image: docker.io/postgres:16-alpine
+    container_name: fluxocaixa-postgres-consolidated
+    environment:
+      POSTGRES_DB: fluxocaixa_consolidated
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-consolidated-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fluxocaixa_consolidated"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
   consolidated-worker:
     build:
       context: ../..
@@ -9,8 +24,17 @@ services:
     ports:
       - "5002:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=postgres-consolidated;Port=5432;Database=fluxocaixa_consolidated;Username=postgres;Password=postgres;Maximum Pool Size=200;Minimum Pool Size=50
       - RabbitMQ__Host=rabbitmq
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
-      - otel-collector
+      postgres-consolidated:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+
+volumes:
+  postgres-consolidated-data:
