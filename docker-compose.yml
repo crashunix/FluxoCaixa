@@ -22,12 +22,7 @@ services:
       - "16686:16686" # Jaeger Web UI
     environment:
       - COLLECTOR_OTLP_ENABLED=true
-      - SPAN_STORAGE_TYPE=badger
-      - BADGER_EPHEMERAL=false
-      - BADGER_DIRECTORY_VALUE=/badger/data
-      - BADGER_DIRECTORY_KEY=/badger/key
-    volumes:
-      - jaeger-data:/badger
+      - SPAN_STORAGE_TYPE=memory
 
   loki:
     image: grafana/loki:3.0.0
@@ -87,5 +82,4 @@ volumes:
   loki-data:
   prometheus-data:
   grafana-data:
-  jaeger-data:
   rabbitmq-data:
