@@ -4,6 +4,8 @@ using System.Text.Json;
 using System.Threading.Channels;
 using FluxoCaixa.Consolidated.Domain.Repositories;
 using FluxoCaixa.Shared.Events;
+using Polly;
+using Polly.Retry;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -58,20 +60,30 @@ public sealed class TransactionCreatedConsumer : BackgroundService
             TopologyRecoveryEnabled = true
         };
 
-        IConnection connection;
-        while (true)
-        {
-            try
+        var pipeline = new ResiliencePipelineBuilder<IConnection>()
+            .AddRetry(new RetryStrategyOptions<IConnection>
             {
-                connection = await factory.CreateConnectionAsync(stoppingToken);
-                break;
-            }
-            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
-            {
-                _logger.LogWarning(ex, "Aguardando disponibilidade do RabbitMQ...");
-                await Task.Delay(3000, stoppingToken);
-            }
-        }
+                ShouldHandle = new PredicateBuilder<IConnection>()
+                    .Handle<Exception>(ex => ex is not OperationCanceledException),
+                MaxRetryAttempts = 10,
+                Delay = TimeSpan.FromSeconds(2),
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true,
+                OnRetry = args =>
+                {
+                    _logger.LogWarning(
+                        args.Outcome.Exception,
+                        "Tentativa {AttemptNumber} de conexão ao RabbitMQ falhou. Nova tentativa em {RetryDelay}...",
+                        args.AttemptNumber + 1,
+                        args.RetryDelay);
+                    return ValueTask.CompletedTask;
+                }
+            })
+            .Build();
+
+        var connection = await pipeline.ExecuteAsync(
+            async token => await factory.CreateConnectionAsync(token),
+            stoppingToken);
 
         using var channel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
 
