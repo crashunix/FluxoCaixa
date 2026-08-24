@@ -23,7 +23,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
     app.MapScalarApiReference();
 }
 
-app.MapGet("/api/consolidated", async ([FromQuery] DateOnly date, IDailyBalanceRepository repository, CancellationToken cancellationToken) =>
+app.MapGet("/consolidated", async ([FromQuery] DateOnly date, IDailyBalanceRepository repository, CancellationToken cancellationToken) =>
 {
     var balance = await repository.GetByDateAsync(date, cancellationToken);
 
