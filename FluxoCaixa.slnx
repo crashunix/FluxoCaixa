@@ -1,9 +1,6 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/Consolidated/">
-    <Project Path="src/Consolidated/FluxoCaixa.Consolidated.Application/FluxoCaixa.Consolidated.Application.csproj" />
-    <Project Path="src/Consolidated/FluxoCaixa.Consolidated.Domain/FluxoCaixa.Consolidated.Domain.csproj" />
-    <Project Path="src/Consolidated/FluxoCaixa.Consolidated.Infrastructure/FluxoCaixa.Consolidated.Infrastructure.csproj" />
     <Project Path="src/Consolidated/FluxoCaixa.Consolidated.Worker/FluxoCaixa.Consolidated.Worker.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
