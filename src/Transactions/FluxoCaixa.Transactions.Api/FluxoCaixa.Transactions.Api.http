@@ -1,6 +1,23 @@
-@FluxoCaixa.Transactions.Api_HostAddress = http://localhost:5130
+@baseUrl = http://localhost:5001
 
-GET {{FluxoCaixa.Transactions.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Criar Transação de Crédito
+POST {{baseUrl}}/transactions
+Content-Type: application/json
 
-###
+{
+  "amount": 150.50,
+  "currency": "BRL",
+  "transactionType": 1,
+  "description": "Venda de produto em loja física"
+}
+
+### Criar Transação de Débito
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "amount": 45.00,
+  "currency": "BRL",
+  "transactionType": 2,
+  "description": "Pagamento de fornecedor de insumos"
+}

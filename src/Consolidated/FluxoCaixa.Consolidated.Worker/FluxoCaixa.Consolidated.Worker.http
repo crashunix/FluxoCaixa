@@ -1,6 +1,5 @@
-@FluxoCaixa.Consolidated.Worker_HostAddress = http://localhost:5045
+@baseUrl = http://localhost:5002
 
-GET {{FluxoCaixa.Consolidated.Worker_HostAddress}}/weatherforecast/
+### Obter Saldo Consolidado por Data
+GET {{baseUrl}}/api/consolidated?date=2026-08-24
 Accept: application/json
-
-###
