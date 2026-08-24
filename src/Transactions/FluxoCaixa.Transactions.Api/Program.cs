@@ -5,6 +5,7 @@ using FluxoCaixa.Transactions.Application.Commands.CreateTransaction;
 using FluxoCaixa.Transactions.Infrastructure;
 using MediatR;
 using Npgsql;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +30,7 @@ app.UseExceptionHandler();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
