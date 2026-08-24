@@ -9,10 +9,6 @@ Sistema corporativo de gestão de lançamentos financeiros (créditos e débitos
 O sistema foi desenhado para garantir **alta resiliência**, **desacoplamento total** e **alta vazão de processamento** (suportando picos de mais de 50 chamadas por segundo com tolerância a falhas).
 ```mermaid
 
----
-config:
-  layout: elk
----
 flowchart TB
  subgraph SvcA["Serviço de Lançamentos"]
         DB1[("PostgreSQL (Transactions)")]
